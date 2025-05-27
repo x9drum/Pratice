@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>練習紀錄遊戲</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: url('images/background.png') no-repeat center center fixed; background-size: cover; text-align: center; }
+    .screen { display: none; padding: 20px; }
+    .visible { display: block; }
+
+    .bottle-select { display: flex; justify-content: center; align-items: flex-end; gap: 20px; margin-top: 40px; }
+    .bottle-container { display: flex; justify-content: center; align-items: center; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 20px; }
+
+    .bottle-small img { width: 80px; pointer-events: auto; }
+    .bottle-medium img { width: 120px; pointer-events: auto; }
+    .bottle-large img { width: 160px; pointer-events: auto; }
+
+    #game-area { position: relative; width: 100%; height: 100vh; background: transparent; overflow: hidden; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 40px; }
+    .bottle-wrapper { position: relative; display: inline-block; max-width: 50vw; max-height: 70vh; }
+    .bottle-wrapper img { width: 100%; height: 70vh; display: block; }
+    .ball { position: absolute; width: 24px !important; height: 24px !important; pointer-events: none; }
+
+    #counter { font-size: 24px; margin: 10px; color: #fff; text-shadow: 2px 2px 4px #000; }
+    #reward { margin-top: 20px; }
+    #reward img { width: 100px; }
+    #back-btn { margin-top: 20px; padding: 10px 20px; cursor: pointer; background: #333; color: white; border: none; border-radius: 5px; }
+  </style>
+</head>
+<body>
+
+  <div id="screen-home" class="screen visible">
+    <h1 style="color: white; text-shadow: 2px 2px 4px #000;">選擇玻璃瓶</h1>
+    <div class="bottle-select">
+      <div class="bottle-container bottle-small"><img src="images/glass1.png" data-count="10"></div>
+      <div class="bottle-container bottle-medium"><img src="images/glass2.png" data-count="20"></div>
+      <div class="bottle-container bottle-large"><img src="images/glass3.png" data-count="30"></div>
+    </div>
+  </div>
+
+  <div id="screen-game" class="screen">
+    <h1 id="counter">0 / 0</h1>
+    <div id="game-area"></div>
+  </div>
+
+  <div id="screen-reward" class="screen">
+    <h1 style="color: white; text-shadow: 2px 2px 4px #000;">恭喜獲得寶物！</h1>
+    <div id="reward"></div>
+    <button id="back-btn">返回</button>
+  </div>
+
+<script>
+let ballData = []; // 儲存球的位置資料
+let ballSize = 24;
+let maxBalls = 0;
+let currentBalls = 0;
+let bottleWrapper = null;
+
+const bottleImages = document.querySelectorAll('.bottle-select img');
+const gameArea = document.getElementById('game-area');
+
+bottleImages.forEach(img => {
+  img.addEventListener('click', () => {
+    maxBalls = parseInt(img.dataset.count);
+    currentBalls = 0;
+    ballData = [];
+    document.getElementById('counter').textContent = `0 / ${maxBalls}`;
+
+    gameArea.innerHTML = '';
+
+    bottleWrapper = document.createElement('div');
+    bottleWrapper.classList.add('bottle-wrapper');
+
+    const bottle = document.createElement('img');
+    bottle.src = img.src;
+    bottle.alt = 'Glass Bottle';
+
+    bottleWrapper.appendChild(bottle);
+    gameArea.appendChild(bottleWrapper);
+
+    bottleWrapper.addEventListener('click', (e) => {
+      if (currentBalls >= maxBalls) return;
+
+      const rect = bottle.getBoundingClientRect();
+      const x = e.clientX - rect.left - 5;
+      const y = e.clientY - rect.top - 5;
+
+      if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+
+      const ball = document.createElement('img');
+      ball.src = 'images/ball.png';
+      ball.classList.add('ball');
+      bottleWrapper.appendChild(ball);
+
+      // 計算堆疊位置
+      let column = Math.floor(Math.random() * 5); // 水平分成 5 格隨機分配
+      let baseX = (bottle.clientWidth * 0.35) + (column * ballSize * 1.2); // 瓶子寬度 20% 起點
+      let stackCount = ballData.filter(b => b.column === column).length;
+      let targetY = bottle.clientHeight * 0.7 - (stackCount * ballSize);
+
+      ballData.push({ column: column, y: targetY });
+
+      let posX = x;
+      let posY = y;
+      let velocityY = 0;
+      let gravity = 0.5;
+      let bounceFactor = 0.6;
+      let hasCounted = false;
+
+      function fall() {
+        velocityY += gravity;
+        posY += velocityY;
+        posX += (baseX - posX) * 0.05;
+
+        if (posY >= targetY) {
+          posY = targetY;
+          velocityY *= -bounceFactor;
+
+          if (Math.abs(velocityY) < 0.5 && !hasCounted) {
+            hasCounted = true;
+            currentBalls++;
+            document.getElementById('counter').textContent = `${currentBalls} / ${maxBalls}`;
+
+            if (currentBalls === maxBalls) {
+              setTimeout(showReward, 500);
+            }
+          }
+        }
+
+        ball.style.left = `${posX}px`;
+        ball.style.top = `${posY}px`;
+
+        if (velocityY !== 0 || Math.abs(posX - baseX) > 0.5) {
+          requestAnimationFrame(fall);
+        }
+      }
+
+      fall();
+
+    });
+
+    showScreen('screen-game');
+  });
+});
+
+function showReward() {
+  showScreen('screen-reward');
+  const r = Math.random();
+  let rewardImg = '';
+  if (r <= 0.7) rewardImg = 'images/merold.png';
+  else if (r <= 0.9) rewardImg = 'images/diamond.png';
+  else rewardImg = 'images/tnt.png';
+
+  document.getElementById('reward').innerHTML = `<img src="${rewardImg}">`;
+}
+
+const backBtn = document.getElementById('back-btn');
+backBtn.addEventListener('click', () => {
+  document.querySelectorAll('.ball').forEach(b => b.remove());
+  showScreen('screen-home');
+  ballData = [];
+});
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
+  document.getElementById(id).classList.add('visible');
+}
+</script>
+</body>
+</html>
